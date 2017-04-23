@@ -1,0 +1,16 @@
+<output>
+	<fontfamily family="Arial,Helvetica" />
+	<fontsize size="11" />
+	<shadowcolor color="#000000" />
+	<shadowalpha alpha="0.25" />
+	<shadowoffset dx="2" dy="3" />
+	<translate dx="-1064" dy="-886" />
+	<scale scale="1" />
+	<save />
+	<scale scale="1" />
+	<fillcolor color="#ffffff" />
+	<strokecolor color="#000000" />
+	<roundrect x="1064" y="886" w="120" h="60" dx="9" dy="9" />
+	<fillstroke />
+	<restore />
+</output>
