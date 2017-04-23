@@ -30,6 +30,7 @@ import com.mxgraph.util.mxUtils;
 @RestController
 public class GraphResouce {
 
+	private static final MediaType MEDIATYPE_APPLICATION_UNKOWN = MediaType.parseMediaType("application/x-unknown");
 	@Autowired
 	private Renderer renderer;
 
@@ -81,7 +82,7 @@ public class GraphResouce {
 
 	private void handleFileName(String filename, BodyBuilder responseBuilder) {
 		if (filename != null) {
-			responseBuilder.contentType(MediaType.parseMediaType("application/x-unknown"));
+			responseBuilder.contentType(MEDIATYPE_APPLICATION_UNKOWN);
 			HttpHeaders httpHeaders = new HttpHeaders();
 			httpHeaders.set("Content-Disposition",
 					"attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + filename);
@@ -108,11 +109,15 @@ public class GraphResouce {
 	private void renderPdf(URI uri, String format, int w, int h, String bgColorStr, String xml, BodyBuilder responseBuilder) {
 		Color bg = toBgColor(bgColorStr);
 		try {
+			
 			ByteArrayOutputStream out = new ByteArrayOutputStream();
 			renderer.renderPdf(uri.toString(), w, h, bg, xml, out);
 			byte[] byteArray = out.toByteArray();
 			responseBuilder.contentLength(byteArray.length);
-			responseBuilder.contentType(MediaType.parseMediaType(""));
+			
+			responseBuilder.contentType(MediaType.APPLICATION_PDF);
+			
+			
 			responseBuilder.body(byteArray);
 		} catch (IOException | SAXException | ParserConfigurationException e) {
 			e.printStackTrace();
@@ -126,11 +131,27 @@ public class GraphResouce {
 
 		try {
 
+			MediaType mediaType = MEDIATYPE_APPLICATION_UNKOWN;
+			format = format != null ? format : "";
+			switch(format.toLowerCase()) {
+			case "png":
+				mediaType = MediaType.IMAGE_PNG;
+				break;
+			case "jpeg":
+			case "jpg":
+				mediaType = MediaType.IMAGE_JPEG;
+				break;
+			case "gif":
+				mediaType = MediaType.IMAGE_GIF;
+				break;
+				
+			}
+			
 			ByteArrayOutputStream out = new ByteArrayOutputStream();
 			renderer.renderImage(uri.toString(), format, w, h, bgColor, xml, out);
 			byte[] byteArray = out.toByteArray();
 			responseBuilder.contentLength(byteArray.length);
-			responseBuilder.contentType(MediaType.parseMediaType(""));
+			responseBuilder.contentType(mediaType);
 			responseBuilder.body(byteArray);
 
 		} catch (IOException | SAXException | ParserConfigurationException e) {

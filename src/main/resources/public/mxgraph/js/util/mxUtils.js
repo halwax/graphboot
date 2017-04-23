@@ -781,7 +781,7 @@ var mxUtils =
 	 */
 	htmlEntities: function(s, newline)
 	{
-		s = s || '';
+		s = String(s || '');
 		
 		s = s.replace(/&/g,'&amp;'); // 38 26
 		s = s.replace(/"/g,'&quot;'); // 34 22
@@ -859,50 +859,57 @@ var mxUtils =
 	 */
 	extractTextWithWhitespace: function(elems)
 	{
-		// Converts newlines in plain text to breaks in HTML
-		// to match the plain text output
-	    var ignoreBr = false;
-	    var ret = [];
+	    // Known block elements for handling linefeeds (list is not complete)
+		var blocks = ['BLOCKQUOTE', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'OL', 'P', 'PRE', 'TABLE', 'UL'];
+		var ret = [];
+		
+		function doExtract(elts)
+		{
+			// Single break should be ignored
+			if (elts.length == 1 && (elts[0].nodeName == 'BR' ||
+				elts[0].innerHTML == '\n'))
+			{
+				return;
+			}
+			
+		    for (var i = 0; i < elts.length; i++)
+		    {
+		        var elem = elts[i];
+
+				// DIV with a br or linefeed forces a linefeed
+				if (elem.nodeName == 'BR' || elem.innerHTML == '\n' ||
+					((elts.length == 1 || i == 0) && (elem.nodeName == 'DIV' &&
+					elem.innerHTML.toLowerCase() == '<br>')))
+		    	{
+	    			ret.push('\n');
+		    	}
+				else
+				{
+			        if (elem.nodeType === 3 || elem.nodeType === 4)
+			        {
+			        	if (elem.nodeValue.length > 0)
+			        	{
+			        		ret.push(elem.nodeValue);
+			        	}
+			        }
+			        else if (elem.nodeType !== 8 && elem.childNodes.length > 0)
+					{
+						doExtract(elem.childNodes);
+					}
+			        
+	        		if (i < elts.length - 1 && mxUtils.indexOf(blocks, elts[i + 1].nodeName) >= 0)
+	        		{
+	        			ret.push('\n');		
+	        		}
+				}
+		    }
+		};
+		
+		doExtract(elems);
 	    
-	    for (var i = 0; elems[i]; i++)
-	    {
-	        var elem = elems[i];
-
-	        // Get the text from text nodes and CDATA nodes
-	        if (elem.nodeType === 3 || elem.nodeType === 4)
-	        {
-	        	// Workaround for last empty element in IE 11
-	        	if (document.documentMode == 11 && i == elems.length - 1 && elem.nodeValue.length == 0)
-        		{
-        			break;
-        		}
-	        	
-	        	// Only inserts a newline if the next element is not another text element
-	        	ret.push(elem.nodeValue + ((elem.nextSibling == null || elem.nextSibling.nodeType != 3) ? '\n' : ''));
-	            ignoreBr = true;
-
-	        // Traverse everything else, except comment nodes
-	        }
-	        else if (elem.nodeType !== 8)
-	        {
-	        	// Best effort normalization translates BR (except after text) and empty P (in IE) to line breaks
-	        	if ((((mxClient.IS_IE || mxClient.IS_IE11) && elem.nodeName == 'P' && elem.innerHTML.length == 0)) ||
-	        		(!ignoreBr && elem.nodeName == 'BR') || (elem.nodeName == 'DIV' && elem.innerHTML == '<br>'))
-	        	{
-	        		ret.push('\n');
-	        	}
-	        	else
-	        	{	 
-	        		ret.push(mxUtils.extractTextWithWhitespace(elem.childNodes));
-	        	}
-
-		        ignoreBr = false;
-	        }
-	    }
-
 	    return ret.join('');
 	},
-	
+
 	/**
 	 * Function: replaceTrailingNewlines
 	 * 
@@ -2488,7 +2495,25 @@ var mxUtils =
 		var offsetLeft = 0;
 		var offsetTop = 0;
 		
-		if (scrollOffset != null && scrollOffset)
+		// Ignores document scroll origin for fixed elements
+		var fixed = false;
+		var node = container;
+		var b = document.body;
+		var d = document.documentElement;
+
+		while (node != null && node != b && node != d && !fixed)
+		{
+			var style = mxUtils.getCurrentStyle(node);
+			
+			if (style != null)
+			{
+				fixed = fixed || style.position == 'fixed';
+			}
+			
+			node = node.parentNode;
+		}
+		
+		if (!scrollOffset && !fixed)
 		{
 			var offset = mxUtils.getDocumentScrollOrigin(container.ownerDocument);
 			offsetLeft += offset.x;
@@ -2536,10 +2561,12 @@ var mxUtils =
 	 */
 	getScrollOrigin: function(node)
 	{
-		var b = document.body;
-		var d = document.documentElement;
-		var result = mxUtils.getDocumentScrollOrigin((node != null) ? node.ownerDocument : document);
-		
+		var doc = (node != null) ? node.ownerDocument : document;
+		var b = doc.body;
+		var d = doc.documentElement;
+		var result = new mxPoint();
+		var fixed = false;
+
 		while (node != null && node != b && node != d)
 		{
 			if (!isNaN(node.scrollLeft) && !isNaN(node.scrollTop))
@@ -2548,12 +2575,27 @@ var mxUtils =
 				result.y += node.scrollTop;
 			}
 			
+			var style = mxUtils.getCurrentStyle(node);
+			
+			if (style != null)
+			{
+				fixed = fixed || style.position == 'fixed';
+			}
+
 			node = node.parentNode;
+		}
+
+		if (!fixed)
+		{
+			var origin = mxUtils.getDocumentScrollOrigin(doc);
+
+			result.x += origin.x;
+			result.y += origin.y;
 		}
 		
 		return result;
 	},
-	
+
 	/**
 	 * Function: convertPoint
 	 * 
