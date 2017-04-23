@@ -13,6 +13,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.docdriven.graphboot.render.Constants.RenderType;
 import org.docdriven.graphboot.render.Renderer;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -40,7 +41,7 @@ public class GraphResouce {
 	}
 
 	@RequestMapping(value = "/export")
-	public ResponseEntity<String> export(@RequestParam("xml") String xml, @RequestParam("format") String format,
+	public ResponseEntity<byte[]> export(@RequestParam("xml") String xml, @RequestParam("format") String format,
 			@RequestParam("filename") String filename, @RequestParam(value = "bg", required = false) String bgColorStr,
 			@RequestParam(value = "w", required = false) Integer w,
 			@RequestParam(value = "h", required = false) Integer h, RequestEntity<String> requestEntity)
@@ -49,35 +50,35 @@ public class GraphResouce {
 		return handleRequest(xml, format, filename, bgColorStr, w, h, requestEntity);
 	}
 
-	private ResponseEntity<String> handleRequest(String xml, String format, String filename, String bgColorStr,
+	private ResponseEntity<byte[]> handleRequest(String xml, String format, String filename, String bgColorStr,
 			Integer w, Integer h, RequestEntity<String> requestEntity) throws UnsupportedEncodingException {
 
 		if (xml != null && xml.startsWith("%3C")) {
 			xml = URLDecoder.decode(xml, "UTF-8");
 		}
 
+		
 		BodyBuilder responseBuilder = ResponseEntity.status(HttpStatus.OK);
 		handleFileName(filename, responseBuilder);
+		ResponseEntity<byte[]> response = responseBuilder.build();
 
 		switch (toRenderType(format)) {
 		case IMAGE:
-			renderImage(requestEntity.getUrl(), format, w, h, bgColorStr, xml, responseBuilder);
+			response = renderImage(requestEntity.getUrl(), format, w, h, bgColorStr, xml, responseBuilder);
 			break;
 		case PDF:
-			renderPdf(requestEntity.getUrl(), format, w, h, bgColorStr, xml, responseBuilder);
+			response = renderPdf(requestEntity.getUrl(), format, w, h, bgColorStr, xml, responseBuilder);
 			break;
 		case SVG:
-			renderSvg(responseBuilder);
+			response = renderSvg(responseBuilder);
 			break;
 		case XML:
 		default:
-			renderXml(responseBuilder);
+			response = renderXml(responseBuilder);
 			break;
 		}
 
-		// HttpHeaders headers = new HttpHeaders();
-		// headers.add("Content-Type", MediaType.APPLICATION_XML_VALUE);
-		return responseBuilder.build();
+		return response;
 	}
 
 	private void handleFileName(String filename, BodyBuilder responseBuilder) {
@@ -98,15 +99,15 @@ public class GraphResouce {
 		return renderType;
 	}
 
-	private void renderXml(BodyBuilder responseBuilder) {
-
+	private ResponseEntity<byte[]> renderXml(BodyBuilder responseBuilder) {
+		throw new UnsupportedOperationException();
 	}
 
-	private void renderSvg(BodyBuilder responseBuilder) {
-
+	private ResponseEntity<byte[]> renderSvg(BodyBuilder responseBuilder) {
+		throw new UnsupportedOperationException();
 	}
 
-	private void renderPdf(URI uri, String format, int w, int h, String bgColorStr, String xml, BodyBuilder responseBuilder) {
+	private ResponseEntity<byte[]> renderPdf(URI uri, String format, int w, int h, String bgColorStr, String xml, BodyBuilder responseBuilder) {
 		Color bg = toBgColor(bgColorStr);
 		try {
 			
@@ -118,13 +119,13 @@ public class GraphResouce {
 			responseBuilder.contentType(MediaType.APPLICATION_PDF);
 			
 			
-			responseBuilder.body(byteArray);
+			return responseBuilder.body(byteArray);
 		} catch (IOException | SAXException | ParserConfigurationException e) {
-			e.printStackTrace();
+			throw new RuntimeException(e);
 		}
 	}
 
-	private void renderImage(URI uri, String format, int w, int h, String bgColorStr, String xml,
+	private ResponseEntity<byte[]> renderImage(URI uri, String format, int w, int h, String bgColorStr, String xml,
 			BodyBuilder responseBuilder) {
 
 		Color bgColor = toBgColor(bgColorStr);
@@ -149,13 +150,16 @@ public class GraphResouce {
 			
 			ByteArrayOutputStream out = new ByteArrayOutputStream();
 			renderer.renderImage(uri.toString(), format, w, h, bgColor, xml, out);
+			
 			byte[] byteArray = out.toByteArray();
+			
+			responseBuilder.cacheControl(CacheControl.noCache());
 			responseBuilder.contentLength(byteArray.length);
 			responseBuilder.contentType(mediaType);
-			responseBuilder.body(byteArray);
+			return responseBuilder.body(byteArray);
 
 		} catch (IOException | SAXException | ParserConfigurationException e) {
-			e.printStackTrace();
+			throw new RuntimeException(e);
 		}
 
 	}
@@ -166,7 +170,7 @@ public class GraphResouce {
 	}
 
 	@RequestMapping(value = "/save", method = RequestMethod.POST, produces = { MediaType.APPLICATION_XML_VALUE })
-	public ResponseEntity<String> save(@RequestParam("xml") String xml, @RequestParam(name="format", required=false) String format,
+	public ResponseEntity<byte[]> save(@RequestParam("xml") String xml, @RequestParam(name="format", required=false) String format,
 			@RequestParam("filename") String filename, @RequestParam(value = "bg", required = false) String bgColorStr,
 			@RequestParam(value = "w", required = false) Integer w,
 			@RequestParam(value = "h", required = false) Integer h, RequestEntity<String> requestEntity)
