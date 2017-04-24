@@ -19,18 +19,27 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.springframework.stereotype.Service;
+import org.w3c.dom.Document;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
 
 import com.mxgraph.canvas.mxGraphicsCanvas2D;
+import com.mxgraph.canvas.mxICanvas;
 import com.mxgraph.canvas.mxICanvas2D;
+import com.mxgraph.canvas.mxSvgCanvas;
+import com.mxgraph.io.mxCodec;
 import com.mxgraph.reader.mxSaxOutputHandler;
+import com.mxgraph.util.mxCellRenderer;
+import com.mxgraph.util.mxCellRenderer.CanvasFactory;
+import com.mxgraph.util.mxDomUtils;
 import com.mxgraph.util.mxUtils;
+import com.mxgraph.util.mxXmlUtils;
+import com.mxgraph.view.mxGraph;
 
 @Service
 public class Renderer {
-	
+
 	/**
 	 * 
 	 */
@@ -40,7 +49,7 @@ public class Renderer {
 	 * Cache for all images.
 	 */
 	protected transient Hashtable<String, Image> imageCache = new Hashtable<String, Image>();
-	
+
 	/**
 	 * @throws ParserConfigurationException
 	 * @throws SAXException
@@ -48,12 +57,10 @@ public class Renderer {
 	 * 
 	 */
 	public void renderImage(String url, String format, int w, int h, Color bg, String xml, OutputStream out)
-			throws IOException, SAXException, ParserConfigurationException
-	{
+			throws IOException, SAXException, ParserConfigurationException {
 		BufferedImage image = mxUtils.createBufferedImage(w, h, bg);
 
-		if (image != null)
-		{
+		if (image != null) {
 			Graphics2D g2 = image.createGraphics();
 			mxUtils.setAntiAlias(g2, true, true);
 			renderXml(xml, createCanvas(url, g2));
@@ -64,41 +71,40 @@ public class Renderer {
 
 	/**
 	 * Creates and returns the canvas for rendering.
-	 * @throws IOException 
-	 * @throws DocumentException 
-	 * @throws ParserConfigurationException 
-	 * @throws SAXException 
+	 * 
+	 * @throws IOException
+	 * @throws DocumentException
+	 * @throws ParserConfigurationException
+	 * @throws SAXException
 	 */
 	public void renderPdf(String url, int w, int h, Color bg, String xml, OutputStream out)
-			throws IOException, SAXException, ParserConfigurationException
-	{
+			throws IOException, SAXException, ParserConfigurationException {
 		// Fixes PDF offset
 		w += 1;
 		h += 1;
 
 		PDDocument document = new PDDocument();
-		PDPage pdPage = new PDPage();			
+		PDPage pdPage = new PDPage();
 		document.addPage(pdPage);
-		
+
 		PDPageContentStream content = new PDPageContentStream(document, pdPage);
-		
-		BufferedImage bi = new
-			    BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);		
+
+		BufferedImage bi = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
 		mxGraphicsCanvas2D gc = createCanvas(url, bi.createGraphics());
 
 		// Fixes PDF offset
 		gc.translate(1, 1);
 		renderXml(xml, gc);
-		
+
 		gc.getGraphics().dispose();
-		
+
 		bi.flush();
-		
+
 		PDImageXObject imageXObject = LosslessFactory.createFromImage(document, bi);
 		content.drawImage(imageXObject, 0, 0);
-		
+
 		content.close();
-		
+
 		document.save(out);
 		document.close();
 	}
@@ -106,8 +112,8 @@ public class Renderer {
 	/**
 	 * Renders the XML to the given canvas.
 	 */
-	public void renderXml(String xml, mxICanvas2D canvas) throws SAXException, ParserConfigurationException, IOException
-	{
+	public void renderXml(String xml, mxICanvas2D canvas)
+			throws SAXException, ParserConfigurationException, IOException {
 		XMLReader reader = parserFactory.newSAXParser().getXMLReader();
 		reader.setContentHandler(new mxSaxOutputHandler(canvas));
 		reader.parse(new InputSource(new StringReader(xml)));
@@ -116,42 +122,32 @@ public class Renderer {
 	/**
 	 * Creates a graphics canvas with an image cache.
 	 */
-	protected mxGraphicsCanvas2D createCanvas(String url, Graphics2D g2)
-	{
+	protected mxGraphicsCanvas2D createCanvas(String url, Graphics2D g2) {
 		// Caches custom images for the time of the request
 		final Hashtable<String, Image> shortCache = new Hashtable<String, Image>();
 		final String domain = url.isEmpty() ? url : url.substring(0, url.lastIndexOf("/"));
 
-		mxGraphicsCanvas2D g2c = new mxGraphicsCanvas2D(g2)
-		{
-			public Image loadImage(String src)
-			{
+		mxGraphicsCanvas2D g2c = new mxGraphicsCanvas2D(g2) {
+			public Image loadImage(String src) {
 				// Uses local image cache by default
 				Hashtable<String, Image> cache = shortCache;
 
 				// Uses global image cache for local images
-				if (src.startsWith(domain))
-				{
+				if (src.startsWith(domain)) {
 					cache = imageCache;
 				}
 
 				Image image = cache.get(src);
 
-				if (image == null)
-				{
+				if (image == null) {
 					image = super.loadImage(src);
 
-					if (image != null)
-					{
+					if (image != null) {
 						cache.put(src, image);
-					}
-					else
-					{
+					} else {
 						cache.put(src, Constants.EMPTY_IMAGE);
 					}
-				}
-				else if (image == Constants.EMPTY_IMAGE)
-				{
+				} else if (image == Constants.EMPTY_IMAGE) {
 					image = null;
 				}
 

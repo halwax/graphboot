@@ -3,8 +3,14 @@ import java.awt.image.BufferedImage;
 import java.util.Arrays;
 import java.util.List;
 
+import org.springframework.http.MediaType;
+
 public class Constants
 {
+	public static final MediaType MEDIATYPE_APPLICATION_UNKOWN = MediaType.parseMediaType("application/x-unknown");
+	
+	public static final MediaType MEDIATYPE_IMAGE_SVG = MediaType.valueOf("image/svg+xml");
+	
 	/**
 	 * Contains an empty image.
 	 */
@@ -35,10 +41,18 @@ public class Constants
 	 */
 	public static final int MAX_AREA = 10000 * 10000;
 	
+	public static final String IMAGE_FORMAT_GIF = "gif";
+
+	public static final String IMAGE_FORMAT_JPG = "jpg";
+
+	public static final String IMAGE_FORMAT_JPEG = "jpeg";
+
+	public static final String IMAGE_FORMAT_PNG = "png";
+	
 	public enum RenderType {
 		PDF("pdf"),
 		SVG("svg"),
-		IMAGE("png","jpg","gif"),
+		IMAGE(IMAGE_FORMAT_GIF,IMAGE_FORMAT_JPG,IMAGE_FORMAT_PNG, IMAGE_FORMAT_JPEG),
 		XML("xml");
 		
 		private List<String> formats;
